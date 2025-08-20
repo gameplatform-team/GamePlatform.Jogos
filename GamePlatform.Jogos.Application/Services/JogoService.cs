@@ -138,4 +138,20 @@ public class JogoService : IJogoService
         var responseDto = new ComprarJogoResponseDto("Compra iniciada. Aguarde confirmação.", "Pendente", comprarJogoDto.JogoId);
         return new DataResponseDto<ComprarJogoResponseDto>(true, string.Empty, responseDto);
     }
+
+    public async Task<BaseResponseDto> ObterJogosDoUsuarioAsync(Guid usuarioId)
+    {
+        var usuarioJogos = await _usuarioJogosRepository.ObterJogosDoUsuarioAsync(usuarioId);
+        
+        var jogosDto = usuarioJogos.Select(uj => new MeuJogoDto
+        {
+            Id = uj.JogoId,
+            Titulo = uj.Jogo.Titulo,
+            Descricao = uj.Jogo.Descricao,
+            CompradoEm = uj.CompradoEm
+        }).ToList();
+        
+        var mensagem = jogosDto.Count == 0 ? "Nenhum jogo comprado" : string.Empty;
+        return new DataResponseDto<List<MeuJogoDto>>(true, mensagem, jogosDto);
+    }
 }

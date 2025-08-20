@@ -2,6 +2,8 @@ namespace GamePlatform.Jogos.Domain.Entities;
 
 public class UsuarioJogo
 {
+    private UsuarioJogo() { }
+    
     public UsuarioJogo(Guid usuarioId, Guid jogoId)
     {
         Id = Guid.NewGuid();
@@ -15,4 +17,6 @@ public class UsuarioJogo
     public Guid UsuarioId { get; internal set; }
     public Guid JogoId { get; internal set; }
     public DateTime CompradoEm { get; internal set; }
+    
+    public Jogo Jogo { get; private set; } = null!;
 }

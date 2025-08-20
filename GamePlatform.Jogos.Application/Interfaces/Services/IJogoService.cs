@@ -16,4 +16,5 @@ public interface IJogoService
     public Task<BaseResponseDto> AtualizarAsync(AtualizarJogoDto jogoDto);
     public Task<BaseResponseDto> RemoverAsync(Guid id);
     public Task<BaseResponseDto> ComprarJogoAsync(Guid usuarioId, ComprarJogoDto comprarJogoDto);
+    public Task<BaseResponseDto> ObterJogosDoUsuarioAsync(Guid usuarioId);
 }

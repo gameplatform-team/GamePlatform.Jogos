@@ -17,5 +17,9 @@ public class UsuarioJogoConfiguration : IEntityTypeConfiguration<UsuarioJogo>
 
         builder.Property(j => j.JogoId)
             .IsRequired();
+        
+        builder.HasOne(uj => uj.Jogo)
+            .WithMany()
+            .HasForeignKey(uj => uj.JogoId);
     }
 }

@@ -27,4 +27,16 @@ public class UsuarioJogosRepository : IUsuarioJogosRepository
 
         return await usuarioJogo.AnyAsync();
     }
+
+    public async Task<List<UsuarioJogo>> ObterJogosDoUsuarioAsync(Guid usuarioId)
+    {
+        // return await _context.UsuarioJogos
+        //     .Where(uj => uj.UsuarioId == usuarioId)
+        //     .Select(uj => uj.Jogo)
+        //     .ToListAsync();
+        
+        return await _context.UsuarioJogos
+            .Include(uj => uj.Jogo)
+            .Where(uj => uj.UsuarioId == usuarioId).ToListAsync();
+    }
 }

@@ -136,4 +136,18 @@ public class JogoController : ControllerBase
         var resultado = await _jogoService.ComprarJogoAsync(usuarioId, comprarJogoDto);
         return !resultado.Sucesso ? BadRequest(resultado) : Accepted(resultado);
     }
+    
+    /// <summary>
+    /// Obtém lista de jogos do usuário logado
+    /// </summary>
+    /// <response code="200">Lista de jogos do usuário</response>
+    [ProducesResponseType(typeof(DataResponseDto<List<JogoDto>>), 200)]
+    [HttpGet("meus-jogos")]
+    [Authorize]
+    public async Task<IActionResult> GetUserGamesAsync()
+    {
+        var usuarioId = _usuarioContext.GetUsuarioId();
+        var resultado = await _jogoService.ObterJogosDoUsuarioAsync(usuarioId);
+        return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
+    }
 }

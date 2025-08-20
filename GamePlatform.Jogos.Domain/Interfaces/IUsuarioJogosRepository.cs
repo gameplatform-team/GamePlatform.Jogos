@@ -6,4 +6,5 @@ public interface IUsuarioJogosRepository
 {
     public Task AdicionarAsync(UsuarioJogo usuarioJogo);
     public Task<bool> ExisteUsuarioJogoAsync(Guid usuarioId, Guid jogoId);
+    public Task<List<UsuarioJogo>> ObterJogosDoUsuarioAsync(Guid usuarioId);
 }
