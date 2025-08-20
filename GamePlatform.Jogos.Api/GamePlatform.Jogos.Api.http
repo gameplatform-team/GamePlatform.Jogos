@@ -1,0 +1,6 @@
+@GamePlatform.Jogos.Api_HostAddress = http://localhost:5167
+
+GET {{GamePlatform.Jogos.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
