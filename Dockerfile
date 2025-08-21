@@ -37,4 +37,5 @@ WORKDIR /app
 COPY --from=build /app/publish .
 
 EXPOSE 8081
+ENV ASPNETCORE_URLS=http://+:8081
 ENTRYPOINT ["dotnet", "GamePlatform.Jogos.Api.dll"]
