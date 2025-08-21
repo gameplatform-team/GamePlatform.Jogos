@@ -29,6 +29,9 @@ builder.AddCustomHealthCheck();
 // Adicionar configuracoes do banco de dados e servicos da infraestrutura
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
+// Mensageria
+builder.Services.AddMessaging(builder.Configuration);
+
 // Adicionar servicos da camada de aplica��o
 builder.Services.AddApplicationServices();
 

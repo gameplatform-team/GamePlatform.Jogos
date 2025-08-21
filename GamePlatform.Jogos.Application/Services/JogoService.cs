@@ -1,9 +1,11 @@
 using System.Linq.Expressions;
 using GamePlatform.Jogos.Application.DTOs;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
+using GamePlatform.Jogos.Application.DTOs.Messaging;
 using GamePlatform.Jogos.Application.Interfaces.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
+using GamePlatform.Jogos.Domain.Interfaces.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace GamePlatform.Jogos.Application.Services;
@@ -12,13 +14,16 @@ public class JogoService : IJogoService
 {
     private readonly IJogoRepository _jogoRepository;
     private readonly IUsuarioJogosRepository _usuarioJogosRepository;
+    private readonly IServiceBusPublisher _publisher;
 
     public JogoService(
         IJogoRepository jogoRepository,
-        IUsuarioJogosRepository usuarioJogosRepository)
+        IUsuarioJogosRepository usuarioJogosRepository,
+        IServiceBusPublisher publisher)
     {
         _jogoRepository = jogoRepository;
         _usuarioJogosRepository = usuarioJogosRepository;
+        _publisher = publisher;
     }
 
     public async Task<BaseResponseDto> CadastrarAsync(CadastrarJogoDto jogoDto)
@@ -132,8 +137,21 @@ public class JogoService : IJogoService
         // var compraPendente = new CompraPendente(usuarioId, comprarJogoDto.JogoId, "Solicitado");
         // await _comprasPendentesRepository.AdicionarAsync(compraPendente);
         
-        // TODO publica evento GamePurchaseRequested
-        
+        var message = new GamePurchaseRequestedMessage
+        {
+            UsuarioId = usuarioId,
+            JogoId = comprarJogoDto.JogoId,
+            Preco = jogo.Preco,
+            SolicitadoEm = DateTime.UtcNow
+        };
+
+        await _publisher.PublishAsync(
+            queueName: "game-purchase-requested",
+            message: message,
+            messageId: Guid.NewGuid().ToString(),
+            correlationId: usuarioId.ToString(),
+            ct: CancellationToken.None
+        );
         
         var responseDto = new ComprarJogoResponseDto("Compra iniciada. Aguarde confirmação.", "Pendente", comprarJogoDto.JogoId);
         return new DataResponseDto<ComprarJogoResponseDto>(true, string.Empty, responseDto);
