@@ -2,9 +2,9 @@ name: CI/CD da API de Jogos
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 env:
   DOCKER_IMAGE_NAME: brunolazzara/gameplatform-jogos-fiap
@@ -32,7 +32,7 @@ jobs:
       run: dotnet test GamePlatform.Jogos.Tests/GamePlatform.Jogos.Tests.csproj --verbosity normal
 
   build-and-deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build-and-test
     runs-on: ubuntu-latest
 
