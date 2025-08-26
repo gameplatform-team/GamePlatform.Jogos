@@ -58,8 +58,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    #   - name: Deploy no Azure Web App
-    #     uses: azure/webapps-deploy@v3
-    #     with:
-    #       app-name: ${{ env.AZURE_WEBAPP_NAME }}
-    #       images: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+      - name: Deploy para o Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: 'gameplatform'
+          containerAppName: 'gameplatform-jogos-api'
+          image: 'brunolazzara/gameplatform-jogos-fiap'
