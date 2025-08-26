@@ -63,4 +63,4 @@ jobs:
         with:
           resourceGroup: 'gameplatform'
           containerAppName: 'gameplatform-jogos-api'
-          image: 'brunolazzara/gameplatform-jogos-fiap'
+          imageToDeploy: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
