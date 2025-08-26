@@ -64,3 +64,6 @@ jobs:
           resourceGroup: 'gameplatform'
           containerAppName: 'gameplatform-jogos-api'
           imageToDeploy: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          targetPort: 8081
+          location: 'Brazil South'
+          containerAppEnvironment: 'gameplatform-apis'
