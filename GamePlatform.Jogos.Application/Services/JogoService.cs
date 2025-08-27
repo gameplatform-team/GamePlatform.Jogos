@@ -133,10 +133,6 @@ public class JogoService : IJogoService
         if (usuarioJogo)
             return new BaseResponseDto(false, "Usuário já possui este jogo");
         
-        // TODO (opcional) gravar intenção de compra em uma nova tabela (ComprasPendentes)
-        // var compraPendente = new CompraPendente(usuarioId, comprarJogoDto.JogoId, "Solicitado");
-        // await _comprasPendentesRepository.AdicionarAsync(compraPendente);
-        
         var message = new GamePurchaseRequestedMessage
         {
             UsuarioId = usuarioId,
@@ -171,5 +167,11 @@ public class JogoService : IJogoService
         
         var mensagem = jogosDto.Count == 0 ? "Nenhum jogo comprado" : string.Empty;
         return new DataResponseDto<List<MeuJogoDto>>(true, mensagem, jogosDto);
+    }
+
+    public async Task AdicionaJogoUsuarioAsync(PaymentSuccessMessage message)
+    {
+        var usuarioJogo = new UsuarioJogo(message.UsuarioId, message.JogoId);
+        await _usuarioJogosRepository.AdicionarAsync(usuarioJogo);
     }
 }

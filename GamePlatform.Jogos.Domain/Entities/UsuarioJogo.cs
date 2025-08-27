@@ -13,10 +13,10 @@ public class UsuarioJogo
         JogoId = jogoId;
     }
     
-    public Guid Id { get; internal set; }
-    public Guid UsuarioId { get; internal set; }
-    public Guid JogoId { get; internal set; }
-    public DateTime CompradoEm { get; internal set; }
+    public Guid Id { get; init; }
+    public Guid UsuarioId { get; init; }
+    public Guid JogoId { get; init; }
+    public DateTime CompradoEm { get; init; }
     
     public Jogo Jogo { get; private set; } = null!;
 }
