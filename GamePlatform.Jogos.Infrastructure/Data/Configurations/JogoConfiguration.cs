@@ -22,6 +22,9 @@ public class JogoConfiguration : IEntityTypeConfiguration<Jogo>
         
         builder.Property(j => j.Descricao)
             .IsRequired();
+        
+        builder.Property(j => j.Categoria)
+            .IsRequired();
 
         builder.HasIndex(j => j.Titulo).IsUnique();
     }

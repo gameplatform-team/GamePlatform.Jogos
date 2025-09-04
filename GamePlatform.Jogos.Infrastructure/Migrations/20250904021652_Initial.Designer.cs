@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GamePlatform.Jogos.Infrastructure.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20250820011247_CreateTableUsuarioJogos")]
-    partial class CreateTableUsuarioJogos
+    [Migration("20250904021652_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -30,6 +30,10 @@ namespace GamePlatform.Jogos.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Categoria")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -74,7 +78,20 @@ namespace GamePlatform.Jogos.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("JogoId");
+
                     b.ToTable("UsuarioJogos", (string)null);
+                });
+
+            modelBuilder.Entity("GamePlatform.Jogos.Domain.Entities.UsuarioJogo", b =>
+                {
+                    b.HasOne("GamePlatform.Jogos.Domain.Entities.Jogo", "Jogo")
+                        .WithMany()
+                        .HasForeignKey("JogoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Jogo");
                 });
 #pragma warning restore 612, 618
         }

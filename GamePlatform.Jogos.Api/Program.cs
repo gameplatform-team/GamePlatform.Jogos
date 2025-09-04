@@ -38,6 +38,9 @@ builder.Services.AddMessaging(builder.Configuration);
 // Adicionar servicos da camada de aplica��o
 builder.Services.AddApplicationServices();
 
+// Elasticsearch
+builder.Services.AddElasticsearch(builder.Configuration);
+
 // Controllers e Swagger
 builder.Services.AddControllers().AddJsonOptions(options =>
 {

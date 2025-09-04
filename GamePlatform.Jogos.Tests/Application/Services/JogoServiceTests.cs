@@ -1,9 +1,11 @@
 using System.Linq.Expressions;
 using GamePlatform.Jogos.Application.DTOs;
+using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
 using GamePlatform.Jogos.Application.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
+using GamePlatform.Jogos.Domain.Interfaces.Elastic;
 using GamePlatform.Jogos.Domain.Interfaces.Messaging;
 using Moq;
 
@@ -14,6 +16,7 @@ public class JogoServiceTests
     private readonly Mock<IJogoRepository> _jogoRepoMock;
     private readonly Mock<IUsuarioJogosRepository> _usuarioJogosRepoMock;
     private readonly Mock<IServiceBusPublisher> _serviceBusPubclisherMock;
+    private readonly Mock<IElasticClient<JogoIndexMapping>> _elasticClientMock;
     private readonly JogoService _jogoService;
 
     public JogoServiceTests()
@@ -21,7 +24,12 @@ public class JogoServiceTests
         _jogoRepoMock = new Mock<IJogoRepository>();
         _usuarioJogosRepoMock = new Mock<IUsuarioJogosRepository>();
         _serviceBusPubclisherMock = new Mock<IServiceBusPublisher>();
-        _jogoService = new JogoService(_jogoRepoMock.Object, _usuarioJogosRepoMock.Object, _serviceBusPubclisherMock.Object);
+        _elasticClientMock = new Mock<IElasticClient<JogoIndexMapping>>();
+        _jogoService = new JogoService(
+            _jogoRepoMock.Object,
+            _usuarioJogosRepoMock.Object,
+            _serviceBusPubclisherMock.Object,
+            _elasticClientMock.Object);
     }
 
     [Fact]
@@ -65,13 +73,14 @@ public class JogoServiceTests
     public async Task ObterPorIdAsync_DeveRetornarJogo_QuandoExistir()
     {
         // Arrange
-        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.");
+        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.", "Categoria");
         var jogoDto = new JogoDto
         {
             Id = jogo.Id,
             Titulo = jogo.Titulo,
             Preco = jogo.Preco,
-            Descricao = jogo.Descricao
+            Descricao = jogo.Descricao,
+            Categoria = jogo.Categoria
         };
         
         _jogoRepoMock.Setup(x => x.ObterPorIdAsync(It.IsAny<Guid>())).ReturnsAsync(jogo);
@@ -106,8 +115,8 @@ public class JogoServiceTests
         // Arrange
         var jogos = new List<Jogo>
         {
-            new("Jogo 1", 99.99m, "Descricao do Jogo 1."),
-            new("Jogo 2", 149.99m, "Descricao do Jogo 2.")
+            new("Jogo 1", 99.99m, "Descricao do Jogo 1.", "Categoria Jogo 1"),
+            new("Jogo 2", 149.99m, "Descricao do Jogo 2.", "Categoria Jogo 2")
         };
 
         var jogosDtos = jogos.Select(j =>
@@ -116,7 +125,8 @@ public class JogoServiceTests
                 Id = j.Id,
                 Titulo = j.Titulo,
                 Preco = j.Preco,
-                Descricao = j.Descricao
+                Descricao = j.Descricao,
+                Categoria = j.Categoria
             });
         
         _jogoRepoMock.Setup(x => x.ObterTodosPaginadoAsync(
@@ -165,7 +175,8 @@ public class JogoServiceTests
             Id = Guid.NewGuid(),
             Titulo = "Novo Nome Do Jogo",
             Preco = 129.99m,
-            Descricao = "Uma nova descricao"
+            Descricao = "Uma nova descricao",
+            Categoria = "Categoria"
         };
 
         _jogoRepoMock
@@ -192,9 +203,10 @@ public class JogoServiceTests
             Id = Guid.NewGuid(),
             Titulo = "Novo Nome Do Jogo",
             Preco = 129.99m,
-            Descricao = "Uma nova descricao"
+            Descricao = "Uma nova descricao",
+            Categoria = "Categoria"
         };
-        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.");
+        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.", "Categoria");
 
         _jogoRepoMock
             .Setup(x => x.ObterPorIdAsync(It.Is<Guid>(
@@ -203,7 +215,7 @@ public class JogoServiceTests
         
         _jogoRepoMock
             .Setup(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()))
-            .ReturnsAsync([ new Jogo("Novo Nome Do Jogo", 99.99m, "Outra descricao.")]);
+            .ReturnsAsync([ new Jogo("Novo Nome Do Jogo", 99.99m, "Outra descricao.", "Categoria")]);
 
         // Act
         var resultado = await _jogoService.AtualizarAsync(jogoDto);
@@ -225,9 +237,10 @@ public class JogoServiceTests
             Id = Guid.NewGuid(),
             Titulo = "Novo Nome Do Jogo",
             Preco = 129.99m,
-            Descricao = "Uma nova descricao"
+            Descricao = "Uma nova descricao",
+            Categoria = "Categoria"
         };
-        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.");
+        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.", "Categoria");
 
         _jogoRepoMock
             .Setup(x => x.ObterPorIdAsync(It.Is<Guid>(
@@ -278,7 +291,7 @@ public class JogoServiceTests
     public async Task RemoverAsync_DeveRetornarSucesso_QuandoJogoRemovido()
     {
         // Arrange
-        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.");
+        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.", "Categoria");
         
         _jogoRepoMock
             .Setup(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogo.Id)))

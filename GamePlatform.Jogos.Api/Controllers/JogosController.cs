@@ -150,4 +150,6 @@ public class JogoController : ControllerBase
         var resultado = await _jogoService.ObterJogosDoUsuarioAsync(usuarioId);
         return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
     }
+    
+    // TODO criar endpoints GET /recomendados (para o usuário logado) e GET /populares
 }

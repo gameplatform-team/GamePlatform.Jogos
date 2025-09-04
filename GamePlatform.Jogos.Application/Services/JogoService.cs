@@ -1,10 +1,13 @@
 using System.Linq.Expressions;
+using Elastic.Clients.Elasticsearch;
 using GamePlatform.Jogos.Application.DTOs;
+using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
 using GamePlatform.Jogos.Application.DTOs.Messaging;
 using GamePlatform.Jogos.Application.Interfaces.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
+using GamePlatform.Jogos.Domain.Interfaces.Elastic;
 using GamePlatform.Jogos.Domain.Interfaces.Messaging;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,18 +15,23 @@ namespace GamePlatform.Jogos.Application.Services;
 
 public class JogoService : IJogoService
 {
+    private const string JOGOS_INDEX_NAME = "jogos";
+    
     private readonly IJogoRepository _jogoRepository;
     private readonly IUsuarioJogosRepository _usuarioJogosRepository;
     private readonly IServiceBusPublisher _publisher;
+    private readonly IElasticClient<JogoIndexMapping> _elasticClient;
 
     public JogoService(
         IJogoRepository jogoRepository,
         IUsuarioJogosRepository usuarioJogosRepository,
-        IServiceBusPublisher publisher)
+        IServiceBusPublisher publisher,
+        IElasticClient<JogoIndexMapping> elasticClient)
     {
         _jogoRepository = jogoRepository;
         _usuarioJogosRepository = usuarioJogosRepository;
         _publisher = publisher;
+        _elasticClient = elasticClient;
     }
 
     public async Task<BaseResponseDto> CadastrarAsync(CadastrarJogoDto jogoDto)
@@ -31,8 +39,21 @@ public class JogoService : IJogoService
         if (await _jogoRepository.ExisteTituloAsync(jogoDto.Titulo))
             return new BaseResponseDto(false, "Jogo já cadastrado");
 
-        var jogo = new Jogo(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao);
+        var jogo = new Jogo(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
         await _jogoRepository.AdicionarAsync(jogo);
+        
+        var jogoIndex = new JogoIndexMapping()
+        {
+            Id = jogo.Id.ToString(),
+            Titulo = jogo.Titulo,
+            Preco = jogo.Preco,
+            Descricao = jogo.Descricao,
+            Categoria = jogo.Categoria,
+            CreatedAt = jogo.CreatedAt,
+            Popularidade = 0
+        };
+        
+        await _elasticClient.CreateAsync(jogoIndex, JOGOS_INDEX_NAME);
         
         return new BaseResponseDto(true, "Jogo cadastrado com sucesso");
     }
@@ -49,7 +70,8 @@ public class JogoService : IJogoService
             Id = jogo.Id,
             Titulo = jogo.Titulo,
             Preco = jogo.Preco,
-            Descricao = jogo.Descricao
+            Descricao = jogo.Descricao,
+            Categoria = jogo.Categoria
         };
         
         return new DataResponseDto<JogoDto>(true, string.Empty, jogoDto);
@@ -62,6 +84,8 @@ public class JogoService : IJogoService
         int numeroPagina = 1,
         int tamanhoPagina = 10)
     {
+        // TODO buscar jogos no ElasticSearch em vez de banco de dados
+        
         Expression<Func<Jogo, bool>>? filtro = null;
 
         if (!string.IsNullOrWhiteSpace(titulo) || precoMinimo.HasValue || precoMaximo.HasValue)
@@ -81,7 +105,8 @@ public class JogoService : IJogoService
                 Id = jogo.Id,
                 Titulo = jogo.Titulo,
                 Preco = jogo.Preco,
-                Descricao = jogo.Descricao
+                Descricao = jogo.Descricao,
+                Categoria = jogo.Categoria
             }),
             NumeroPagina = numeroPagina,
             TamanhoPagina = tamanhoPagina,
@@ -104,9 +129,11 @@ public class JogoService : IJogoService
         if (jogosComMesmoTitulo.Any())
             return new BaseResponseDto(false, "Já existe outro jogo com este título");
 
-        jogoExistente.Atualizar(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao);
+        jogoExistente.Atualizar(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
     
         await _jogoRepository.AtualizarAsync(jogoExistente);
+        
+        // TODO atualizar jogo no ElasticSearch
     
         return new BaseResponseDto(true, "Jogo atualizado com sucesso");
     }
@@ -119,6 +146,8 @@ public class JogoService : IJogoService
             return new BaseResponseDto(false, "Jogo não encontrado");
         
         await _jogoRepository.RemoverAsync(jogoExistente);
+        
+        // TODO remover jogo do ElasticSearch
         
         return new BaseResponseDto(true, "Jogo removido com sucesso");
     }
@@ -162,6 +191,7 @@ public class JogoService : IJogoService
             Id = uj.JogoId,
             Titulo = uj.Jogo.Titulo,
             Descricao = uj.Jogo.Descricao,
+            Categoria = uj.Jogo.Categoria,
             CompradoEm = uj.CompradoEm
         }).ToList();
         
@@ -173,5 +203,7 @@ public class JogoService : IJogoService
     {
         var usuarioJogo = new UsuarioJogo(message.UsuarioId, message.JogoId);
         await _usuarioJogosRepository.AdicionarAsync(usuarioJogo);
+        
+        // TODO incrementar campo "popularidade" do jogo no ElasticSearch
     }
 }

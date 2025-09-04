@@ -11,9 +11,10 @@ public class JogoTests
         var titulo = "Super Mario";
         var preco = 59.99m;
         var descricao = "Jogo de plataforma";
+        var categoria = "Plataforma";
 
         // Act
-        var jogo = new Jogo(titulo, preco, descricao);
+        var jogo = new Jogo(titulo, preco, descricao, categoria);
 
         // Assert
         Assert.Equal(titulo, jogo.Titulo);
@@ -33,16 +34,18 @@ public class JogoTests
         var titulo = "Super Mario";
         var preco = 59.99m;
         var descricao = "Jogo de plataforma";
+        var categoria = "Plataforma";
         
-        var jogo = new Jogo(titulo, preco, descricao);
+        var jogo = new Jogo(titulo, preco, descricao, categoria);
         
         // Act
-        jogo.Atualizar("Super Mario Bros", 89.99m, "Nova descricao");
+        jogo.Atualizar("Super Mario Bros", 89.99m, "Nova descricao", "Nova categoria");
         
         // Assert
         Assert.Equal("Super Mario Bros", jogo.Titulo);
         Assert.Equal(89.99m, jogo.Preco);
         Assert.Equal("Nova descricao", jogo.Descricao);
+        Assert.Equal("Nova categoria", jogo.Categoria);
         Assert.NotNull(jogo.UpdatedAt);
         Assert.True(jogo.UpdatedAt <= DateTime.UtcNow);
     }
