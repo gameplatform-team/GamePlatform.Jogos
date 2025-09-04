@@ -1,7 +1,10 @@
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using Elastic.Clients.Elasticsearch;
 using GamePlatform.Jogos.Application.DTOs;
 using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
+using GamePlatform.Jogos.Application.Interfaces.Elastic;
 using GamePlatform.Jogos.Application.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
@@ -16,7 +19,7 @@ public class JogoServiceTests
     private readonly Mock<IJogoRepository> _jogoRepoMock;
     private readonly Mock<IUsuarioJogosRepository> _usuarioJogosRepoMock;
     private readonly Mock<IServiceBusPublisher> _serviceBusPubclisherMock;
-    private readonly Mock<IElasticClient<JogoIndexMapping>> _elasticClientMock;
+    private readonly Mock<IJogoElasticClient> _elasticClientMock;
     private readonly JogoService _jogoService;
 
     public JogoServiceTests()
@@ -24,7 +27,7 @@ public class JogoServiceTests
         _jogoRepoMock = new Mock<IJogoRepository>();
         _usuarioJogosRepoMock = new Mock<IUsuarioJogosRepository>();
         _serviceBusPubclisherMock = new Mock<IServiceBusPublisher>();
-        _elasticClientMock = new Mock<IElasticClient<JogoIndexMapping>>();
+        _elasticClientMock = new Mock<IJogoElasticClient>();
         _jogoService = new JogoService(
             _jogoRepoMock.Object,
             _usuarioJogosRepoMock.Object,
@@ -47,6 +50,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ExisteTituloAsync(jogoDto.Titulo), Times.Once);
         _jogoRepoMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Once);
+        _elasticClientMock.Verify(x => x.CreateAsync(It.IsAny<JogoIndexMapping>(), It.IsAny<IndexName>()), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo cadastrado com sucesso", resultado.Mensagem);
     }
@@ -65,6 +69,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ExisteTituloAsync(jogoDto.Titulo), Times.Once);
         _jogoRepoMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.CreateAsync(It.IsAny<JogoIndexMapping>(), It.IsAny<IndexName>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo já cadastrado", resultado.Mensagem);
     }
@@ -113,35 +118,56 @@ public class JogoServiceTests
     public async Task ObterTodosAsync_DeveRetornarLista_QuandoExistemJogos()
     {
         // Arrange
-        var jogos = new List<Jogo>
+        var jogosList = new List<JogoIndexMapping>
         {
-            new("Jogo 1", 99.99m, "Descricao do Jogo 1.", "Categoria Jogo 1"),
-            new("Jogo 2", 149.99m, "Descricao do Jogo 2.", "Categoria Jogo 2")
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Titulo = "Jogo 1",
+                Preco = 99.99m,
+                Descricao = "Descricao do Jogo 1.",
+                Categoria = "Categoria Jogo 1"           
+            },
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Titulo = "Jogo 2",
+                Preco = 149.99m,
+                Descricao = "Descricao do Jogo 2.",
+                Categoria = "Categoria Jogo 2"           
+            }
         };
+        
+        var jogos = new ReadOnlyCollection<JogoIndexMapping>(jogosList);
 
         var jogosDtos = jogos.Select(j =>
             new JogoDto
             {
-                Id = j.Id,
+                Id = Guid.Parse(j.Id),
                 Titulo = j.Titulo,
                 Preco = j.Preco,
                 Descricao = j.Descricao,
                 Categoria = j.Categoria
             });
-        
-        _jogoRepoMock.Setup(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
-            It.IsAny<int>(),
-            It.IsAny<int>())).ReturnsAsync((jogos, jogos.Count));
+
+        _elasticClientMock.Setup(x => x.ObterTodosAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string?>(),
+                It.IsAny<double?>(),
+                It.IsAny<double?>()))
+            .ReturnsAsync((jogos, (long)jogos.Count));
         
         // Act
         var resultado = await _jogoService.ObterTodosAsync();
         
         // Assert
-        _jogoRepoMock.Verify(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
+        _elasticClientMock.Verify(x => x.ObterTodosAsync(
             It.IsAny<int>(),
-            It.IsAny<int>()), Times.Once);
+            It.IsAny<int>(),
+            It.IsAny<string?>(),
+            It.IsAny<double?>(),
+            It.IsAny<double?>()), Times.Once);
         Assert.Equal(jogos.Count, resultado.Itens.Count());
         Assert.Equivalent(jogosDtos, resultado.Itens, true);
     }
@@ -150,19 +176,24 @@ public class JogoServiceTests
     public async Task ObterTodosAsync_DeveRetornarListaVazia_QuandoNaoExistemJogos()
     {
         // Arrange
-        _jogoRepoMock.Setup(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
-            It.IsAny<int>(),
-            It.IsAny<int>())).ReturnsAsync(([], 0));
+        _elasticClientMock.Setup(x => x.ObterTodosAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string?>(),
+                It.IsAny<double?>(),
+                It.IsAny<double?>()))
+            .ReturnsAsync(([], 0L));
         
         // Act
         var resultado = await _jogoService.ObterTodosAsync();
         
         // Assert
-        _jogoRepoMock.Verify(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
+        _elasticClientMock.Verify(x => x.ObterTodosAsync(
             It.IsAny<int>(),
-            It.IsAny<int>()), Times.Once);
+            It.IsAny<int>(),
+            It.IsAny<string?>(),
+            It.IsAny<double?>(),
+            It.IsAny<double?>()), Times.Once);
         Assert.Empty(resultado.Itens);
     }
     

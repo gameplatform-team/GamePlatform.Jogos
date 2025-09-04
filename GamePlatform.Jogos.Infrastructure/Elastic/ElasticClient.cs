@@ -7,16 +7,16 @@ namespace GamePlatform.Jogos.Infrastructure.Elastic;
 
 public class ElasticClient<T> : IElasticClient<T>
 {
-    private readonly ElasticsearchClient _client;
+    protected readonly ElasticsearchClient Client;
 
     public ElasticClient(IOptions<ElasticSettings> options)
     {
-        _client = new ElasticsearchClient(options.Value.CloudId, new ApiKey(options.Value.ApiKey));
+        Client = new ElasticsearchClient(options.Value.CloudId, new ApiKey(options.Value.ApiKey));
     }
 
     public async Task<IReadOnlyCollection<T>> SearchAsync(int pagina, int quantidade, IndexName index)
     {
-        var response = await _client.SearchAsync<T>(s => s
+        var response = await Client.SearchAsync<T>(s => s
             .Indices(index)
             .From(pagina)
             .Size(quantidade));
@@ -26,7 +26,7 @@ public class ElasticClient<T> : IElasticClient<T>
 
     public async Task<bool> CreateAsync(T entity, IndexName index)
     {
-        var response = await _client.IndexAsync<T>(entity, s => s.Index(index));
+        var response = await Client.IndexAsync<T>(entity, s => s.Index(index));
         return response.IsValidResponse;
     }
 }

@@ -1,3 +1,5 @@
+using GamePlatform.Jogos.Application.Elastic;
+using GamePlatform.Jogos.Application.Interfaces.Elastic;
 using GamePlatform.Jogos.Domain.Interfaces.Elastic;
 using GamePlatform.Jogos.Infrastructure.Elastic;
 
@@ -9,6 +11,7 @@ public static class ElasticConfiguration
     {
         services.Configure<ElasticSettings>(configuration.GetSection("ElasticSettings"));
         services.AddScoped(typeof(IElasticClient<>), typeof(ElasticClient<>));
+        services.AddScoped<IJogoElasticClient, JogoElasticClient>();
 
         return services;
     }
