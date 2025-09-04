@@ -39,20 +39,9 @@ public class JogoService : IJogoService
             return new BaseResponseDto(false, "Jogo já cadastrado");
 
         var jogo = new Jogo(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
+        
         await _jogoRepository.AdicionarAsync(jogo);
-        
-        var jogoIndex = new JogoIndexMapping()
-        {
-            Id = jogo.Id.ToString(),
-            Titulo = jogo.Titulo,
-            Preco = jogo.Preco,
-            Descricao = jogo.Descricao,
-            Categoria = jogo.Categoria,
-            CreatedAt = jogo.CreatedAt,
-            Popularidade = 0
-        };
-        
-        await _elasticClient.CreateAsync(jogoIndex, JOGOS_INDEX_NAME);
+        await _elasticClient.AdicionarAsync(jogo);
         
         return new BaseResponseDto(true, "Jogo cadastrado com sucesso");
     }
@@ -110,9 +99,9 @@ public class JogoService : IJogoService
 
     public async Task<BaseResponseDto> AtualizarAsync(AtualizarJogoDto jogoDto)
     {
-        var jogoExistente = await _jogoRepository.ObterPorIdAsync(jogoDto.Id);
+        var jogo = await _jogoRepository.ObterPorIdAsync(jogoDto.Id);
     
-        if (jogoExistente == null)
+        if (jogo == null)
             return new BaseResponseDto(false, "Jogo não encontrado");
     
         var jogosComMesmoTitulo = await _jogoRepository.ObterTodosAsync(
@@ -121,25 +110,23 @@ public class JogoService : IJogoService
         if (jogosComMesmoTitulo.Any())
             return new BaseResponseDto(false, "Já existe outro jogo com este título");
 
-        jogoExistente.Atualizar(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
+        jogo.Atualizar(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
     
-        await _jogoRepository.AtualizarAsync(jogoExistente);
-        
-        // TODO atualizar jogo no ElasticSearch
+        await _jogoRepository.AtualizarAsync(jogo);
+        await _elasticClient.AtualizarAsync(jogo);
     
         return new BaseResponseDto(true, "Jogo atualizado com sucesso");
     }
 
     public async Task<BaseResponseDto> RemoverAsync(Guid id)
     {
-        var jogoExistente = await _jogoRepository.ObterPorIdAsync(id);
+        var jogo = await _jogoRepository.ObterPorIdAsync(id);
     
-        if (jogoExistente == null)
+        if (jogo == null)
             return new BaseResponseDto(false, "Jogo não encontrado");
         
-        await _jogoRepository.RemoverAsync(jogoExistente);
-        
-        // TODO remover jogo do ElasticSearch
+        await _jogoRepository.RemoverAsync(jogo);
+        await _elasticClient.RemoverAsync(jogo.Id);
         
         return new BaseResponseDto(true, "Jogo removido com sucesso");
     }

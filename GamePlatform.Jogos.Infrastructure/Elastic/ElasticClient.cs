@@ -29,4 +29,10 @@ public class ElasticClient<T> : IElasticClient<T>
         var response = await Client.IndexAsync<T>(entity, s => s.Index(index));
         return response.IsValidResponse;
     }
+
+    public async Task<bool> DeleteAsync(Guid id, IndexName index)
+    {
+        var response = await Client.DeleteAsync(index, id);
+        return response.IsValidResponse;
+    }
 }

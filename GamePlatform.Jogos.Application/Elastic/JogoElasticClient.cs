@@ -1,6 +1,7 @@
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.Interfaces.Elastic;
+using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Infrastructure.Elastic;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +13,22 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
     
     public JogoElasticClient(IOptions<ElasticSettings> options) : base(options)
     {
+    }
+    
+    public async Task AdicionarAsync(Jogo jogo)
+    {
+        var jogoIndex = new JogoIndexMapping()
+        {
+            Id = jogo.Id.ToString(),
+            Titulo = jogo.Titulo,
+            Preco = jogo.Preco,
+            Descricao = jogo.Descricao,
+            Categoria = jogo.Categoria,
+            CreatedAt = jogo.CreatedAt,
+            Popularidade = 0
+        };
+        
+        await CreateAsync(jogoIndex, Index);
     }
 
     public async Task<(IReadOnlyCollection<JogoIndexMapping> Documents, long Total)> ObterTodosAsync(
@@ -57,5 +74,25 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
 
         var total = response.HitsMetadata.Total?.Value1?.Value ?? 0;
         return (response.Documents, total);
+    }
+
+    public async Task AtualizarAsync(Jogo jogo)
+    {
+        await Client.UpdateAsync<JogoIndexMapping, object>(
+            Index,
+            jogo.Id.ToString(),
+            u => u.Doc(new
+            {
+                titulo = jogo.Titulo,
+                preco = Convert.ToDouble(jogo.Preco),
+                descricao = jogo.Descricao,
+                categoria = jogo.Categoria
+            })
+        );
+    }
+
+    public async Task RemoverAsync(Guid jogoId)
+    {
+        await DeleteAsync(jogoId, Index);
     }
 }

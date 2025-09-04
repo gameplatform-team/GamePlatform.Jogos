@@ -8,7 +8,6 @@ using GamePlatform.Jogos.Application.Interfaces.Elastic;
 using GamePlatform.Jogos.Application.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
-using GamePlatform.Jogos.Domain.Interfaces.Elastic;
 using GamePlatform.Jogos.Domain.Interfaces.Messaging;
 using Moq;
 
@@ -50,7 +49,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ExisteTituloAsync(jogoDto.Titulo), Times.Once);
         _jogoRepoMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Once);
-        _elasticClientMock.Verify(x => x.CreateAsync(It.IsAny<JogoIndexMapping>(), It.IsAny<IndexName>()), Times.Once);
+        _elasticClientMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo cadastrado com sucesso", resultado.Mensagem);
     }
@@ -69,7 +68,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ExisteTituloAsync(jogoDto.Titulo), Times.Once);
         _jogoRepoMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Never);
-        _elasticClientMock.Verify(x => x.CreateAsync(It.IsAny<JogoIndexMapping>(), It.IsAny<IndexName>()), Times.Never);
+        _elasticClientMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo já cadastrado", resultado.Mensagem);
     }
@@ -221,6 +220,7 @@ public class JogoServiceTests
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoDto.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()), Times.Never);
         _jogoRepoMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo não encontrado", resultado.Mensagem);
     }
@@ -255,6 +255,7 @@ public class JogoServiceTests
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoDto.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()), Times.Once);
         _jogoRepoMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Já existe outro jogo com este título", resultado.Mensagem);
     }
@@ -294,6 +295,7 @@ public class JogoServiceTests
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoDto.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()), Times.Once);
         _jogoRepoMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Once);
+        _elasticClientMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo atualizado com sucesso", resultado.Mensagem);
     }
@@ -314,6 +316,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoId)), Times.Once);
         _jogoRepoMock.Verify(x => x.RemoverAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.RemoverAsync(It.Is<Guid>(g => g == jogoId)), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo não encontrado", resultado.Mensagem);
     }
@@ -338,6 +341,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogo.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.RemoverAsync(It.Is<Jogo>(j => j == jogo)), Times.Once);
+        _elasticClientMock.Verify(x => x.RemoverAsync(It.Is<Guid>(g => g == jogo.Id)), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo removido com sucesso", resultado.Mensagem);
     }
