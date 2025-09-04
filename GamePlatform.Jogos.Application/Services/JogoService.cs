@@ -182,7 +182,6 @@ public class JogoService : IJogoService
     {
         var usuarioJogo = new UsuarioJogo(message.UsuarioId, message.JogoId);
         await _usuarioJogosRepository.AdicionarAsync(usuarioJogo);
-        
-        // TODO incrementar campo "popularidade" do jogo no ElasticSearch
+        await _elasticClient.IncrementarPopularidadeAsync(message.JogoId);
     }
 }

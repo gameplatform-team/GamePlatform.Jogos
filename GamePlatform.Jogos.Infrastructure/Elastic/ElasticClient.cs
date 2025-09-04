@@ -1,5 +1,6 @@
 using Elastic.Clients.Elasticsearch;
 using Elastic.Transport;
+using Elastic.Transport.Products.Elasticsearch;
 using GamePlatform.Jogos.Domain.Interfaces.Elastic;
 using Microsoft.Extensions.Options;
 
@@ -24,15 +25,9 @@ public class ElasticClient<T> : IElasticClient<T>
         return response.Documents;
     }
 
-    public async Task<bool> CreateAsync(T entity, IndexName index)
-    {
-        var response = await Client.IndexAsync<T>(entity, s => s.Index(index));
-        return response.IsValidResponse;
-    }
+    public async Task<ElasticsearchResponse> CreateAsync(T entity, IndexName index)
+        => await Client.IndexAsync<T>(entity, s => s.Index(index));
 
-    public async Task<bool> DeleteAsync(Guid id, IndexName index)
-    {
-        var response = await Client.DeleteAsync(index, id);
-        return response.IsValidResponse;
-    }
+    public async Task<ElasticsearchResponse> DeleteAsync(Guid id, IndexName index)
+        => await Client.DeleteAsync(index, id);
 }

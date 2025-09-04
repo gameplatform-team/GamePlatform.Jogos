@@ -28,7 +28,12 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
             Popularidade = 0
         };
         
-        await CreateAsync(jogoIndex, Index);
+        var response = await CreateAsync(jogoIndex, Index);
+        
+        if (!response.IsValidResponse)
+        {
+            throw new Exception($"Erro ao adicionar jogo no Elasticsearch. ID: {jogo.Id}: {response.DebugInformation}");
+        }
     }
 
     public async Task<(IReadOnlyCollection<JogoIndexMapping> Documents, long Total)> ObterTodosAsync(
@@ -78,7 +83,7 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
 
     public async Task AtualizarAsync(Jogo jogo)
     {
-        await Client.UpdateAsync<JogoIndexMapping, object>(
+        var response = await Client.UpdateAsync<JogoIndexMapping, object>(
             Index,
             jogo.Id.ToString(),
             u => u.Doc(new
@@ -89,10 +94,36 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
                 categoria = jogo.Categoria
             })
         );
+        
+        if (!response.IsValidResponse)
+        {
+            throw new Exception($"Erro ao atualizar jogo no Elasticsearch. ID: {jogo.Id}: {response.DebugInformation}");
+        }
     }
 
     public async Task RemoverAsync(Guid jogoId)
     {
-        await DeleteAsync(jogoId, Index);
+        var response = await DeleteAsync(jogoId, Index);
+        
+        if (!response.IsValidResponse)
+        {
+            throw new Exception($"Erro ao remover jogo no Elasticsearch. ID: {jogoId}: {response.DebugInformation}");
+        }
+    }
+
+    public async Task IncrementarPopularidadeAsync(Guid jogoId)
+    {
+        var response = await Client.UpdateAsync<JogoIndexMapping, object>(
+            Index,
+            jogoId,
+            u => u
+                .Script(s => s.Source("ctx._source.popularidade += params.count").Params(p => p.Add("count", 1)))
+                .RetryOnConflict(3)
+        );
+
+        if (!response.IsValidResponse)
+        {
+            throw new Exception($"Erro ao incrementar popularidade do jogo no Elasticsearch. ID {jogoId}: {response.DebugInformation}");
+        }
     }
 }
