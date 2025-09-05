@@ -141,7 +141,7 @@ public class JogoController : ControllerBase
     /// Obtém lista de jogos do usuário logado
     /// </summary>
     /// <response code="200">Lista de jogos do usuário</response>
-    [ProducesResponseType(typeof(DataResponseDto<List<JogoDto>>), 200)]
+    [ProducesResponseType(typeof(DataResponseDto<List<MeuJogoDto>>), 200)]
     [HttpGet("meus-jogos")]
     [Authorize]
     public async Task<IActionResult> GetUserGamesAsync()
@@ -174,5 +174,17 @@ public class JogoController : ControllerBase
         return Ok(resultado);
     }
     
-    // TODO criar endpoint GET /recomendados (para o usuário logado)
+    /// <summary>
+    /// Obtém lista de jogos recomendados para o usuário logado
+    /// </summary>
+    /// <response code="200">Lista de jogos recomendados para o usuário, por ordem de popularidade</response>
+    [ProducesResponseType(typeof(DataResponseDto<List<JogoDto>>), 200)]
+    [HttpGet("recomendados")]
+    [Authorize]
+    public async Task<IActionResult> GetRecomendadosAsync()
+    {
+        var usuarioId = _usuarioContext.GetUsuarioId();
+        var resultado = await _jogoService.ObterJogosRecomendadosAsync(usuarioId);
+        return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
+    }
 }

@@ -20,4 +20,5 @@ public interface IJogoService
     public Task<BaseResponseDto> ObterJogosDoUsuarioAsync(Guid usuarioId);
     public Task AdicionaJogoUsuarioAsync(PaymentSuccessMessage message);
     public Task<ResultadoPaginadoDto<JogoDto>> ObterJogosPorPopularidadeAsync(int numeroPagina = 1, int tamanhoPagina = 10);
+    public Task<BaseResponseDto> ObterJogosRecomendadosAsync(Guid usuarioId);
 }

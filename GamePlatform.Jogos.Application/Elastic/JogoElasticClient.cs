@@ -144,4 +144,25 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
         return (response.Documents, total);
 
     }
+
+    public async Task<IReadOnlyCollection<JogoIndexMapping>> ObterJogosRecomendadosAsync(IEnumerable<string> categorias)
+    {
+        var response = await Client.SearchAsync<JogoIndexMapping>(s => s
+            .Indices(Index)
+            .Size(100)
+            .Query(q => q
+                .Terms(t => t
+                    .Field(j => j.Categoria)
+                    .Terms(new TermsQueryField([.. categorias]))))
+            .Sort(sr => sr.Field(f => f
+                .Field(j => j.Popularidade)
+                .Order(SortOrder.Desc))));
+
+        if (!response.IsValidResponse)
+        {
+            throw new Exception($"Erro na consulta ES dos jogos recomendados: {response.DebugInformation}");
+        }
+
+        return response.Documents;
+    }
 }

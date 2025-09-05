@@ -20,4 +20,6 @@ public interface IJogoElasticClient : IElasticClient<JogoIndexMapping>
     Task<(IReadOnlyCollection<JogoIndexMapping> jogos, long total)> ObterTodosPorPopularidadeAsync(
         int numeroPagina,
         int tamanhoPagina);
+
+    Task<IReadOnlyCollection<JogoIndexMapping>> ObterJogosRecomendadosAsync(IEnumerable<string> categorias);
 }

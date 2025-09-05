@@ -11,8 +11,6 @@ namespace GamePlatform.Jogos.Application.Services;
 
 public class JogoService : IJogoService
 {
-    private const string JOGOS_INDEX_NAME = "jogos";
-    
     private readonly IJogoRepository _jogoRepository;
     private readonly IUsuarioJogosRepository _usuarioJogosRepository;
     private readonly IServiceBusPublisher _publisher;
@@ -204,5 +202,29 @@ public class JogoService : IJogoService
         };
         
         return result;
+    }
+
+    public async Task<BaseResponseDto> ObterJogosRecomendadosAsync(Guid usuarioId)
+    {
+        var usuarioJogos = await _usuarioJogosRepository.ObterJogosDoUsuarioAsync(usuarioId);
+        
+        var jogosIds = usuarioJogos.Select(uj => uj.JogoId.ToString());
+        var categorias = usuarioJogos.Select(uj => uj.Jogo.Categoria).Distinct();
+
+        var jogosRecomendados = await _elasticClient.ObterJogosRecomendadosAsync(categorias);
+        
+        var jogosDto = jogosRecomendados
+            .Where(jogo => !jogosIds.Contains(jogo.Id))
+            .Select(jogo => new JogoDto
+            {
+                Id = Guid.Parse(jogo.Id),
+                Titulo = jogo.Titulo,
+                Preco = jogo.Preco,
+                Descricao = jogo.Descricao,
+                Categoria = jogo.Categoria
+            }).ToList();
+        
+        var mensagem = jogosDto.Count == 0 ? "Nenhum jogo recomendado" : string.Empty;
+        return new DataResponseDto<List<JogoDto>>(true, mensagem, jogosDto);
     }
 }
