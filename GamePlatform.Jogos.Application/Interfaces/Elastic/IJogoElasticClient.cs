@@ -17,4 +17,7 @@ public interface IJogoElasticClient : IElasticClient<JogoIndexMapping>
     Task AtualizarAsync(Jogo jogo);
     Task RemoverAsync(Guid jogoId);
     Task IncrementarPopularidadeAsync(Guid jogoId);
+    Task<(IReadOnlyCollection<JogoIndexMapping> jogos, long total)> ObterTodosPorPopularidadeAsync(
+        int numeroPagina,
+        int tamanhoPagina);
 }

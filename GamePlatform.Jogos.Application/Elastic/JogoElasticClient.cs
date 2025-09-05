@@ -1,3 +1,4 @@
+using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.Interfaces.Elastic;
@@ -125,5 +126,22 @@ public class JogoElasticClient : ElasticClient<JogoIndexMapping>, IJogoElasticCl
         {
             throw new Exception($"Erro ao incrementar popularidade do jogo no Elasticsearch. ID {jogoId}: {response.DebugInformation}");
         }
+    }
+
+    public async Task<(IReadOnlyCollection<JogoIndexMapping> jogos, long total)> ObterTodosPorPopularidadeAsync(int numeroPagina, int tamanhoPagina)
+    {
+        var offset = (numeroPagina - 1) * tamanhoPagina;
+
+        var response = await Client.SearchAsync<JogoIndexMapping>(s => s
+            .Indices(Index)
+            .From(offset)
+            .Size(tamanhoPagina)
+            .Sort(sr => sr.Field(f => f
+                .Field(j => j.Popularidade)
+                .Order(SortOrder.Desc))));
+
+        var total = response.HitsMetadata.Total?.Value1?.Value ?? 0;
+        return (response.Documents, total);
+
     }
 }

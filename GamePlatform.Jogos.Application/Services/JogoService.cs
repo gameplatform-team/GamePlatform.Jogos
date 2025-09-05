@@ -1,6 +1,4 @@
-using System.Linq.Expressions;
 using GamePlatform.Jogos.Application.DTOs;
-using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
 using GamePlatform.Jogos.Application.DTOs.Messaging;
 using GamePlatform.Jogos.Application.Interfaces.Elastic;
@@ -8,7 +6,6 @@ using GamePlatform.Jogos.Application.Interfaces.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
 using GamePlatform.Jogos.Domain.Interfaces.Messaging;
-using Microsoft.EntityFrameworkCore;
 
 namespace GamePlatform.Jogos.Application.Services;
 
@@ -72,7 +69,7 @@ public class JogoService : IJogoService
         int numeroPagina = 1,
         int tamanhoPagina = 10)
     {
-        var (docs, total) = await _elasticClient.ObterTodosAsync(
+        var (jogos, total) = await _elasticClient.ObterTodosAsync(
             numeroPagina,
             tamanhoPagina,
             titulo,
@@ -81,7 +78,7 @@ public class JogoService : IJogoService
         
         var result = new ResultadoPaginadoDto<JogoDto>()
         {
-            Itens = docs.Select(jogo => new JogoDto
+            Itens = jogos.Select(jogo => new JogoDto
             {
                 Id = Guid.Parse(jogo.Id),
                 Titulo = jogo.Titulo,
@@ -183,5 +180,29 @@ public class JogoService : IJogoService
         var usuarioJogo = new UsuarioJogo(message.UsuarioId, message.JogoId);
         await _usuarioJogosRepository.AdicionarAsync(usuarioJogo);
         await _elasticClient.IncrementarPopularidadeAsync(message.JogoId);
+    }
+
+    public async Task<ResultadoPaginadoDto<JogoDto>> ObterJogosPorPopularidadeAsync(int numeroPagina = 1, int tamanhoPagina = 10)
+    {
+        var (jogos, total) = await _elasticClient.ObterTodosPorPopularidadeAsync(
+            numeroPagina,
+            tamanhoPagina);
+        
+        var result = new ResultadoPaginadoDto<JogoDto>()
+        {
+            Itens = jogos.Select(jogo => new JogoDto
+            {
+                Id = Guid.Parse(jogo.Id),
+                Titulo = jogo.Titulo,
+                Preco = jogo.Preco,
+                Descricao = jogo.Descricao,
+                Categoria = jogo.Categoria
+            }),
+            NumeroPagina = numeroPagina,
+            TamanhoPagina = tamanhoPagina,
+            TotalDeItens = total
+        };
+        
+        return result;
     }
 }
