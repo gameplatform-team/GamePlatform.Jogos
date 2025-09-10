@@ -1,6 +1,10 @@
+using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using Elastic.Clients.Elasticsearch;
 using GamePlatform.Jogos.Application.DTOs;
+using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
+using GamePlatform.Jogos.Application.Interfaces.Elastic;
 using GamePlatform.Jogos.Application.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
@@ -14,6 +18,7 @@ public class JogoServiceTests
     private readonly Mock<IJogoRepository> _jogoRepoMock;
     private readonly Mock<IUsuarioJogosRepository> _usuarioJogosRepoMock;
     private readonly Mock<IServiceBusPublisher> _serviceBusPubclisherMock;
+    private readonly Mock<IJogoElasticClient> _elasticClientMock;
     private readonly JogoService _jogoService;
 
     public JogoServiceTests()
@@ -21,7 +26,12 @@ public class JogoServiceTests
         _jogoRepoMock = new Mock<IJogoRepository>();
         _usuarioJogosRepoMock = new Mock<IUsuarioJogosRepository>();
         _serviceBusPubclisherMock = new Mock<IServiceBusPublisher>();
-        _jogoService = new JogoService(_jogoRepoMock.Object, _usuarioJogosRepoMock.Object, _serviceBusPubclisherMock.Object);
+        _elasticClientMock = new Mock<IJogoElasticClient>();
+        _jogoService = new JogoService(
+            _jogoRepoMock.Object,
+            _usuarioJogosRepoMock.Object,
+            _serviceBusPubclisherMock.Object,
+            _elasticClientMock.Object);
     }
 
     [Fact]
@@ -39,6 +49,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ExisteTituloAsync(jogoDto.Titulo), Times.Once);
         _jogoRepoMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Once);
+        _elasticClientMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo cadastrado com sucesso", resultado.Mensagem);
     }
@@ -57,6 +68,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ExisteTituloAsync(jogoDto.Titulo), Times.Once);
         _jogoRepoMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.AdicionarAsync(It.IsAny<Jogo>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo já cadastrado", resultado.Mensagem);
     }
@@ -65,13 +77,14 @@ public class JogoServiceTests
     public async Task ObterPorIdAsync_DeveRetornarJogo_QuandoExistir()
     {
         // Arrange
-        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.");
+        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.", "Categoria");
         var jogoDto = new JogoDto
         {
             Id = jogo.Id,
             Titulo = jogo.Titulo,
             Preco = jogo.Preco,
-            Descricao = jogo.Descricao
+            Descricao = jogo.Descricao,
+            Categoria = jogo.Categoria
         };
         
         _jogoRepoMock.Setup(x => x.ObterPorIdAsync(It.IsAny<Guid>())).ReturnsAsync(jogo);
@@ -104,34 +117,56 @@ public class JogoServiceTests
     public async Task ObterTodosAsync_DeveRetornarLista_QuandoExistemJogos()
     {
         // Arrange
-        var jogos = new List<Jogo>
+        var jogosList = new List<JogoIndexMapping>
         {
-            new("Jogo 1", 99.99m, "Descricao do Jogo 1."),
-            new("Jogo 2", 149.99m, "Descricao do Jogo 2.")
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Titulo = "Jogo 1",
+                Preco = 99.99m,
+                Descricao = "Descricao do Jogo 1.",
+                Categoria = "Categoria Jogo 1"           
+            },
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Titulo = "Jogo 2",
+                Preco = 149.99m,
+                Descricao = "Descricao do Jogo 2.",
+                Categoria = "Categoria Jogo 2"           
+            }
         };
+        
+        var jogos = new ReadOnlyCollection<JogoIndexMapping>(jogosList);
 
         var jogosDtos = jogos.Select(j =>
             new JogoDto
             {
-                Id = j.Id,
+                Id = Guid.Parse(j.Id),
                 Titulo = j.Titulo,
                 Preco = j.Preco,
-                Descricao = j.Descricao
+                Descricao = j.Descricao,
+                Categoria = j.Categoria
             });
-        
-        _jogoRepoMock.Setup(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
-            It.IsAny<int>(),
-            It.IsAny<int>())).ReturnsAsync((jogos, jogos.Count));
+
+        _elasticClientMock.Setup(x => x.ObterTodosAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string?>(),
+                It.IsAny<double?>(),
+                It.IsAny<double?>()))
+            .ReturnsAsync((jogos, (long)jogos.Count));
         
         // Act
         var resultado = await _jogoService.ObterTodosAsync();
         
         // Assert
-        _jogoRepoMock.Verify(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
+        _elasticClientMock.Verify(x => x.ObterTodosAsync(
             It.IsAny<int>(),
-            It.IsAny<int>()), Times.Once);
+            It.IsAny<int>(),
+            It.IsAny<string?>(),
+            It.IsAny<double?>(),
+            It.IsAny<double?>()), Times.Once);
         Assert.Equal(jogos.Count, resultado.Itens.Count());
         Assert.Equivalent(jogosDtos, resultado.Itens, true);
     }
@@ -140,19 +175,24 @@ public class JogoServiceTests
     public async Task ObterTodosAsync_DeveRetornarListaVazia_QuandoNaoExistemJogos()
     {
         // Arrange
-        _jogoRepoMock.Setup(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
-            It.IsAny<int>(),
-            It.IsAny<int>())).ReturnsAsync(([], 0));
+        _elasticClientMock.Setup(x => x.ObterTodosAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string?>(),
+                It.IsAny<double?>(),
+                It.IsAny<double?>()))
+            .ReturnsAsync(([], 0L));
         
         // Act
         var resultado = await _jogoService.ObterTodosAsync();
         
         // Assert
-        _jogoRepoMock.Verify(x => x.ObterTodosPaginadoAsync(
-            It.IsAny<Expression<Func<Jogo, bool>>>(),
+        _elasticClientMock.Verify(x => x.ObterTodosAsync(
             It.IsAny<int>(),
-            It.IsAny<int>()), Times.Once);
+            It.IsAny<int>(),
+            It.IsAny<string?>(),
+            It.IsAny<double?>(),
+            It.IsAny<double?>()), Times.Once);
         Assert.Empty(resultado.Itens);
     }
     
@@ -165,7 +205,8 @@ public class JogoServiceTests
             Id = Guid.NewGuid(),
             Titulo = "Novo Nome Do Jogo",
             Preco = 129.99m,
-            Descricao = "Uma nova descricao"
+            Descricao = "Uma nova descricao",
+            Categoria = "Categoria"
         };
 
         _jogoRepoMock
@@ -179,6 +220,7 @@ public class JogoServiceTests
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoDto.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()), Times.Never);
         _jogoRepoMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo não encontrado", resultado.Mensagem);
     }
@@ -192,9 +234,10 @@ public class JogoServiceTests
             Id = Guid.NewGuid(),
             Titulo = "Novo Nome Do Jogo",
             Preco = 129.99m,
-            Descricao = "Uma nova descricao"
+            Descricao = "Uma nova descricao",
+            Categoria = "Categoria"
         };
-        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.");
+        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.", "Categoria");
 
         _jogoRepoMock
             .Setup(x => x.ObterPorIdAsync(It.Is<Guid>(
@@ -203,7 +246,7 @@ public class JogoServiceTests
         
         _jogoRepoMock
             .Setup(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()))
-            .ReturnsAsync([ new Jogo("Novo Nome Do Jogo", 99.99m, "Outra descricao.")]);
+            .ReturnsAsync([ new Jogo("Novo Nome Do Jogo", 99.99m, "Outra descricao.", "Categoria")]);
 
         // Act
         var resultado = await _jogoService.AtualizarAsync(jogoDto);
@@ -212,6 +255,7 @@ public class JogoServiceTests
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoDto.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()), Times.Once);
         _jogoRepoMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Já existe outro jogo com este título", resultado.Mensagem);
     }
@@ -225,9 +269,10 @@ public class JogoServiceTests
             Id = Guid.NewGuid(),
             Titulo = "Novo Nome Do Jogo",
             Preco = 129.99m,
-            Descricao = "Uma nova descricao"
+            Descricao = "Uma nova descricao",
+            Categoria = "Categoria"
         };
-        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.");
+        var jogoExistente = new Jogo("Nome Do Jogo", 159.99m, "Descricao do jogo.", "Categoria");
 
         _jogoRepoMock
             .Setup(x => x.ObterPorIdAsync(It.Is<Guid>(
@@ -250,6 +295,7 @@ public class JogoServiceTests
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoDto.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.ObterTodosAsync(It.IsAny<Expression<Func<Jogo, bool>>>()), Times.Once);
         _jogoRepoMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Once);
+        _elasticClientMock.Verify(x => x.AtualizarAsync(It.IsAny<Jogo>()), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo atualizado com sucesso", resultado.Mensagem);
     }
@@ -270,6 +316,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogoId)), Times.Once);
         _jogoRepoMock.Verify(x => x.RemoverAsync(It.IsAny<Jogo>()), Times.Never);
+        _elasticClientMock.Verify(x => x.RemoverAsync(It.Is<Guid>(g => g == jogoId)), Times.Never);
         Assert.False(resultado.Sucesso);
         Assert.Equal("Jogo não encontrado", resultado.Mensagem);
     }
@@ -278,7 +325,7 @@ public class JogoServiceTests
     public async Task RemoverAsync_DeveRetornarSucesso_QuandoJogoRemovido()
     {
         // Arrange
-        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.");
+        var jogo = new Jogo("Jogo Existente", 99.99m, "Descricao do jogo.", "Categoria");
         
         _jogoRepoMock
             .Setup(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogo.Id)))
@@ -294,6 +341,7 @@ public class JogoServiceTests
         // Assert
         _jogoRepoMock.Verify(x => x.ObterPorIdAsync(It.Is<Guid>(g => g == jogo.Id)), Times.Once);
         _jogoRepoMock.Verify(x => x.RemoverAsync(It.Is<Jogo>(j => j == jogo)), Times.Once);
+        _elasticClientMock.Verify(x => x.RemoverAsync(It.Is<Guid>(g => g == jogo.Id)), Times.Once);
         Assert.True(resultado.Sucesso);
         Assert.Equal("Jogo removido com sucesso", resultado.Mensagem);
     }

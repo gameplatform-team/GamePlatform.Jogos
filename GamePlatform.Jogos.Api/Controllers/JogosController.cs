@@ -141,13 +141,50 @@ public class JogoController : ControllerBase
     /// Obtém lista de jogos do usuário logado
     /// </summary>
     /// <response code="200">Lista de jogos do usuário</response>
-    [ProducesResponseType(typeof(DataResponseDto<List<JogoDto>>), 200)]
+    [ProducesResponseType(typeof(DataResponseDto<List<MeuJogoDto>>), 200)]
     [HttpGet("meus-jogos")]
     [Authorize]
     public async Task<IActionResult> GetUserGamesAsync()
     {
         var usuarioId = _usuarioContext.GetUsuarioId();
         var resultado = await _jogoService.ObterJogosDoUsuarioAsync(usuarioId);
+        return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
+    }
+
+    /// <summary>
+    /// Obtém lista de jogos por ordem de popularidade
+    /// </summary>
+    /// <param name="numeroPagina">Número da página solicitada</param>
+    /// <param name="tamanhoPagina">Quantidade de itens por página</param>
+    /// <response code="200">Lista de jogos por ordem de popularidade</response>
+    /// <response code="204">Nenhum jogo encontrado</response>
+    [ProducesResponseType(typeof(ResultadoPaginadoDto<JogoDto>), 200)]
+    [ProducesResponseType(204)]
+    [HttpGet("populares")]
+    [Authorize]
+    public async Task<IActionResult> GetPopularesAsync(
+        [FromQuery] int numeroPagina = 1,
+        [FromQuery] int tamanhoPagina = 10)
+    {
+        var resultado = await _jogoService.ObterJogosPorPopularidadeAsync(numeroPagina, tamanhoPagina);
+        
+        if (!resultado.Itens.Any())
+            return NoContent();
+        
+        return Ok(resultado);
+    }
+    
+    /// <summary>
+    /// Obtém lista de jogos recomendados para o usuário logado
+    /// </summary>
+    /// <response code="200">Lista de jogos recomendados para o usuário, por ordem de popularidade</response>
+    [ProducesResponseType(typeof(DataResponseDto<List<JogoDto>>), 200)]
+    [HttpGet("recomendados")]
+    [Authorize]
+    public async Task<IActionResult> GetRecomendadosAsync()
+    {
+        var usuarioId = _usuarioContext.GetUsuarioId();
+        var resultado = await _jogoService.ObterJogosRecomendadosAsync(usuarioId);
         return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
     }
 }

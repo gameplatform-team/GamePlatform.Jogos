@@ -18,4 +18,8 @@ public class AtualizarJogoDto
     [Required]
     [MinLength(1)]
     public string Descricao { get; init; }
+    
+    [Required]
+    [MinLength(1)]
+    public string Categoria { get; init; }
 }

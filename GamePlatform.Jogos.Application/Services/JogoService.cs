@@ -1,12 +1,11 @@
-using System.Linq.Expressions;
 using GamePlatform.Jogos.Application.DTOs;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
 using GamePlatform.Jogos.Application.DTOs.Messaging;
+using GamePlatform.Jogos.Application.Interfaces.Elastic;
 using GamePlatform.Jogos.Application.Interfaces.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
 using GamePlatform.Jogos.Domain.Interfaces.Messaging;
-using Microsoft.EntityFrameworkCore;
 
 namespace GamePlatform.Jogos.Application.Services;
 
@@ -15,15 +14,18 @@ public class JogoService : IJogoService
     private readonly IJogoRepository _jogoRepository;
     private readonly IUsuarioJogosRepository _usuarioJogosRepository;
     private readonly IServiceBusPublisher _publisher;
+    private readonly IJogoElasticClient _elasticClient;
 
     public JogoService(
         IJogoRepository jogoRepository,
         IUsuarioJogosRepository usuarioJogosRepository,
-        IServiceBusPublisher publisher)
+        IServiceBusPublisher publisher,
+        IJogoElasticClient elasticClient)
     {
         _jogoRepository = jogoRepository;
         _usuarioJogosRepository = usuarioJogosRepository;
         _publisher = publisher;
+        _elasticClient = elasticClient;
     }
 
     public async Task<BaseResponseDto> CadastrarAsync(CadastrarJogoDto jogoDto)
@@ -31,8 +33,10 @@ public class JogoService : IJogoService
         if (await _jogoRepository.ExisteTituloAsync(jogoDto.Titulo))
             return new BaseResponseDto(false, "Jogo já cadastrado");
 
-        var jogo = new Jogo(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao);
+        var jogo = new Jogo(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
+        
         await _jogoRepository.AdicionarAsync(jogo);
+        await _elasticClient.AdicionarAsync(jogo);
         
         return new BaseResponseDto(true, "Jogo cadastrado com sucesso");
     }
@@ -49,7 +53,8 @@ public class JogoService : IJogoService
             Id = jogo.Id,
             Titulo = jogo.Titulo,
             Preco = jogo.Preco,
-            Descricao = jogo.Descricao
+            Descricao = jogo.Descricao,
+            Categoria = jogo.Categoria
         };
         
         return new DataResponseDto<JogoDto>(true, string.Empty, jogoDto);
@@ -62,30 +67,26 @@ public class JogoService : IJogoService
         int numeroPagina = 1,
         int tamanhoPagina = 10)
     {
-        Expression<Func<Jogo, bool>>? filtro = null;
-
-        if (!string.IsNullOrWhiteSpace(titulo) || precoMinimo.HasValue || precoMaximo.HasValue)
-        {
-            filtro = jogo =>
-                (string.IsNullOrWhiteSpace(titulo) || EF.Functions.Like(jogo.Titulo.ToLower(), $"%{titulo.ToLower()}%")) &&
-                (!precoMinimo.HasValue || jogo.Preco >= precoMinimo.Value) &&
-                (!precoMaximo.HasValue || jogo.Preco <= precoMaximo.Value);
-        }
-        
-        var (jogos, totalDeItens) = await _jogoRepository.ObterTodosPaginadoAsync(filtro, numeroPagina, tamanhoPagina);
+        var (jogos, total) = await _elasticClient.ObterTodosAsync(
+            numeroPagina,
+            tamanhoPagina,
+            titulo,
+            precoMinimo.HasValue ? Convert.ToDouble(precoMinimo) : null,
+            precoMaximo.HasValue ? Convert.ToDouble(precoMaximo) : null);
         
         var result = new ResultadoPaginadoDto<JogoDto>()
         {
             Itens = jogos.Select(jogo => new JogoDto
             {
-                Id = jogo.Id,
+                Id = Guid.Parse(jogo.Id),
                 Titulo = jogo.Titulo,
                 Preco = jogo.Preco,
-                Descricao = jogo.Descricao
+                Descricao = jogo.Descricao,
+                Categoria = jogo.Categoria
             }),
             NumeroPagina = numeroPagina,
             TamanhoPagina = tamanhoPagina,
-            TotalDeItens = totalDeItens
+            TotalDeItens = total
         };
         
         return result;
@@ -93,9 +94,9 @@ public class JogoService : IJogoService
 
     public async Task<BaseResponseDto> AtualizarAsync(AtualizarJogoDto jogoDto)
     {
-        var jogoExistente = await _jogoRepository.ObterPorIdAsync(jogoDto.Id);
+        var jogo = await _jogoRepository.ObterPorIdAsync(jogoDto.Id);
     
-        if (jogoExistente == null)
+        if (jogo == null)
             return new BaseResponseDto(false, "Jogo não encontrado");
     
         var jogosComMesmoTitulo = await _jogoRepository.ObterTodosAsync(
@@ -104,21 +105,23 @@ public class JogoService : IJogoService
         if (jogosComMesmoTitulo.Any())
             return new BaseResponseDto(false, "Já existe outro jogo com este título");
 
-        jogoExistente.Atualizar(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao);
+        jogo.Atualizar(jogoDto.Titulo, jogoDto.Preco, jogoDto.Descricao, jogoDto.Categoria);
     
-        await _jogoRepository.AtualizarAsync(jogoExistente);
+        await _jogoRepository.AtualizarAsync(jogo);
+        await _elasticClient.AtualizarAsync(jogo);
     
         return new BaseResponseDto(true, "Jogo atualizado com sucesso");
     }
 
     public async Task<BaseResponseDto> RemoverAsync(Guid id)
     {
-        var jogoExistente = await _jogoRepository.ObterPorIdAsync(id);
+        var jogo = await _jogoRepository.ObterPorIdAsync(id);
     
-        if (jogoExistente == null)
+        if (jogo == null)
             return new BaseResponseDto(false, "Jogo não encontrado");
         
-        await _jogoRepository.RemoverAsync(jogoExistente);
+        await _jogoRepository.RemoverAsync(jogo);
+        await _elasticClient.RemoverAsync(jogo.Id);
         
         return new BaseResponseDto(true, "Jogo removido com sucesso");
     }
@@ -162,6 +165,7 @@ public class JogoService : IJogoService
             Id = uj.JogoId,
             Titulo = uj.Jogo.Titulo,
             Descricao = uj.Jogo.Descricao,
+            Categoria = uj.Jogo.Categoria,
             CompradoEm = uj.CompradoEm
         }).ToList();
         
@@ -173,5 +177,54 @@ public class JogoService : IJogoService
     {
         var usuarioJogo = new UsuarioJogo(message.UsuarioId, message.JogoId);
         await _usuarioJogosRepository.AdicionarAsync(usuarioJogo);
+        await _elasticClient.IncrementarPopularidadeAsync(message.JogoId);
+    }
+
+    public async Task<ResultadoPaginadoDto<JogoDto>> ObterJogosPorPopularidadeAsync(int numeroPagina = 1, int tamanhoPagina = 10)
+    {
+        var (jogos, total) = await _elasticClient.ObterTodosPorPopularidadeAsync(
+            numeroPagina,
+            tamanhoPagina);
+        
+        var result = new ResultadoPaginadoDto<JogoDto>()
+        {
+            Itens = jogos.Select(jogo => new JogoDto
+            {
+                Id = Guid.Parse(jogo.Id),
+                Titulo = jogo.Titulo,
+                Preco = jogo.Preco,
+                Descricao = jogo.Descricao,
+                Categoria = jogo.Categoria
+            }),
+            NumeroPagina = numeroPagina,
+            TamanhoPagina = tamanhoPagina,
+            TotalDeItens = total
+        };
+        
+        return result;
+    }
+
+    public async Task<BaseResponseDto> ObterJogosRecomendadosAsync(Guid usuarioId)
+    {
+        var usuarioJogos = await _usuarioJogosRepository.ObterJogosDoUsuarioAsync(usuarioId);
+        
+        var jogosIds = usuarioJogos.Select(uj => uj.JogoId.ToString());
+        var categorias = usuarioJogos.Select(uj => uj.Jogo.Categoria).Distinct();
+
+        var jogosRecomendados = await _elasticClient.ObterJogosRecomendadosAsync(categorias);
+        
+        var jogosDto = jogosRecomendados
+            .Where(jogo => !jogosIds.Contains(jogo.Id))
+            .Select(jogo => new JogoDto
+            {
+                Id = Guid.Parse(jogo.Id),
+                Titulo = jogo.Titulo,
+                Preco = jogo.Preco,
+                Descricao = jogo.Descricao,
+                Categoria = jogo.Categoria
+            }).ToList();
+        
+        var mensagem = jogosDto.Count == 0 ? "Nenhum jogo recomendado" : string.Empty;
+        return new DataResponseDto<List<JogoDto>>(true, mensagem, jogosDto);
     }
 }
