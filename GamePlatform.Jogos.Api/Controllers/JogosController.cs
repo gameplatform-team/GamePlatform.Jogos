@@ -14,16 +14,13 @@ public class JogoController : ControllerBase
 {
     private readonly IJogoService _jogoService;
     private readonly IUsuarioContextService _usuarioContext;
-    private readonly ILogger<JogoController> _logger;
 
     public JogoController(
         IJogoService jogoService,
-        IUsuarioContextService usuarioContext,
-        ILogger<JogoController> logger)
+        IUsuarioContextService usuarioContext)
     {
         _jogoService = jogoService;
         _usuarioContext = usuarioContext;
-        _logger = logger;
     }
 
     /// <summary>
@@ -38,25 +35,9 @@ public class JogoController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> PostAsync(CadastrarJogoDto jogo)
     {
-        _logger.LogInformation("Iniciando cadastro de jogo. Titulo={Titulo}", jogo.Titulo);
-
         var resultado = await _jogoService.CadastrarAsync(jogo);
 
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning(
-                "Falha ao cadastrar jogo. Titulo={Titulo} Erros={Erros}",
-                jogo.Titulo,
-                resultado.Mensagem);
-
-            return BadRequest(resultado);
-        }
-
-        _logger.LogInformation(
-            "Jogo cadastrado com sucesso. Titulo={Titulo}",
-             jogo.Titulo);
-
-        return StatusCode(201, resultado);
+        return !resultado.Sucesso ? BadRequest(resultado) : StatusCode(201, resultado);
     }
 
     /// <summary>
@@ -80,21 +61,10 @@ public class JogoController : ControllerBase
         [FromQuery] int numeroPagina = 1,
         [FromQuery] int tamanhoPagina = 10)
     {
-        _logger.LogInformation(
-           "Consultando jogos. Titulo={Titulo} PrecoMin={PrecoMin} PrecoMax={PrecoMax} Pagina={Pagina} Tamanho={Tamanho}",
-           titulo, precoMinimo, precoMaximo, numeroPagina, tamanhoPagina);
-
         var resultado = await _jogoService.ObterTodosAsync(titulo, precoMinimo, precoMaximo, numeroPagina, tamanhoPagina);
 
         if (!resultado.Itens.Any())
-        {
-            _logger.LogInformation("Nenhum jogo encontrado para os filtros informados");
             return NoContent();
-        }
-
-        _logger.LogInformation(
-            "Consulta de jogos realizada com sucesso. TotalItens={Total}",
-            resultado.TotalDeItens);
 
         return Ok(resultado);
     }
@@ -111,19 +81,11 @@ public class JogoController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdAsync([FromRoute] Guid id)
     {
-        _logger.LogInformation("Buscando jogo por ID. JogoId={JogoId}", id);
-
         var resultado = await _jogoService.ObterPorIdAsync(id);
 
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning("Jogo não encontrado. JogoId={JogoId}", id);
-            return NotFound(resultado);
-        }
-
-        return Ok(resultado);
+        return !resultado.Sucesso ? NotFound(resultado) : Ok(resultado);
     }
-    
+
     /// <summary>
     /// Atualiza um jogo na plataforma
     /// </summary>
@@ -136,23 +98,9 @@ public class JogoController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> PutAsync(AtualizarJogoDto jogoDto)
     {
-        _logger.LogInformation("Atualizando jogo. JogoId={JogoId}", jogoDto.Id);
-
         var resultado = await _jogoService.AtualizarAsync(jogoDto);
 
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning(
-                "Falha ao atualizar jogo. JogoId={JogoId} Erros={Erros}",
-                jogoDto.Id,
-                resultado.Mensagem);
-
-            return BadRequest(resultado);
-        }
-
-        _logger.LogInformation("Jogo atualizado com sucesso. JogoId={JogoId}", jogoDto.Id);
-
-        return Ok(resultado);
+        return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
     }
 
     /// <summary>
@@ -167,21 +115,11 @@ public class JogoController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteAsync([FromRoute] Guid id)
     {
-        _logger.LogInformation("Removendo jogo. JogoId={JogoId}", id);
-
         var resultado = await _jogoService.RemoverAsync(id);
 
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning("Falha ao remover jogo. JogoId={JogoId}", id);
-            return NotFound(resultado);
-        }
-
-        _logger.LogInformation("Jogo removido com sucesso. JogoId={JogoId}", id);
-
-        return Ok(resultado);
+        return !resultado.Sucesso ? NotFound(resultado) : Ok(resultado);
     }
-    
+
     /// <summary>
     /// Inicia a compra de um jogo pelo usuário logado
     /// </summary>
@@ -195,32 +133,10 @@ public class JogoController : ControllerBase
     public async Task<IActionResult> ComprarAsync([FromBody, Required] ComprarJogoDto comprarJogoDto)
     {
         var usuarioId = _usuarioContext.GetUsuarioId();
-
-        _logger.LogInformation(
-           "Usuário iniciando compra. UsuarioId={UsuarioId} JogoId={JogoId}",
-           usuarioId,
-           comprarJogoDto.JogoId);
-
         var resultado = await _jogoService.ComprarJogoAsync(usuarioId, comprarJogoDto);
-
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning(
-                "Falha na compra do jogo. UsuarioId={UsuarioId} JogoId={JogoId}",
-                usuarioId,
-                comprarJogoDto.JogoId);
-
-            return BadRequest(resultado);
-        }
-
-        _logger.LogInformation(
-            "Compra iniciada com sucesso. UsuarioId={UsuarioId} JogoId={JogoId}",
-            usuarioId,
-            comprarJogoDto.JogoId);
-
-        return Accepted(resultado);
+        return !resultado.Sucesso ? BadRequest(resultado) : Accepted(resultado);
     }
-    
+
     /// <summary>
     /// Obtém lista de jogos do usuário logado
     /// </summary>
@@ -231,22 +147,8 @@ public class JogoController : ControllerBase
     public async Task<IActionResult> GetUserGamesAsync()
     {
         var usuarioId = _usuarioContext.GetUsuarioId();
-
-        _logger.LogInformation("Consultando jogos do usuário. UsuarioId={UsuarioId}", usuarioId);
-
         var resultado = await _jogoService.ObterJogosDoUsuarioAsync(usuarioId);
-
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning("Falha ao consultar jogos do usuário. UsuarioId={UsuarioId} Erros={Erros}", usuarioId, resultado.Mensagem);
-            return BadRequest(resultado);
-        }
-
-        _logger.LogInformation(
-            "Consulta de jogos do usuário finalizada com sucesso. UsuarioId={UsuarioId}",
-            usuarioId);
-
-        return Ok(resultado);
+        return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
     }
 
     /// <summary>
@@ -264,32 +166,14 @@ public class JogoController : ControllerBase
         [FromQuery] int numeroPagina = 1,
         [FromQuery] int tamanhoPagina = 10)
     {
-        _logger.LogInformation(
-           "Consultando jogos populares. Pagina={Pagina} Tamanho={Tamanho}",
-           numeroPagina,
-           tamanhoPagina);
-
         var resultado = await _jogoService.ObterJogosPorPopularidadeAsync(numeroPagina, tamanhoPagina);
 
         if (!resultado.Itens.Any())
-        {
-            _logger.LogInformation(
-                "Consulta de jogos populares sem resultados. Pagina={Pagina} Tamanho={Tamanho}",
-                numeroPagina,
-                tamanhoPagina);
-
             return NoContent();
-        }
-
-        _logger.LogInformation(
-            "Consulta de jogos populares finalizada com sucesso. Pagina={Pagina} Tamanho={Tamanho} QuantidadeItens={Quantidade}",
-            numeroPagina,
-            tamanhoPagina,
-            resultado.TotalDeItens);
 
         return Ok(resultado);
     }
-    
+
     /// <summary>
     /// Obtém lista de jogos recomendados para o usuário logado
     /// </summary>
@@ -300,27 +184,7 @@ public class JogoController : ControllerBase
     public async Task<IActionResult> GetRecomendadosAsync()
     {
         var usuarioId = _usuarioContext.GetUsuarioId();
-
-        _logger.LogInformation(
-          "Consultando jogos recomendados. UsuarioId={UsuarioId}",
-          usuarioId);
-
         var resultado = await _jogoService.ObterJogosRecomendadosAsync(usuarioId);
-
-        if (!resultado.Sucesso)
-        {
-            _logger.LogWarning(
-                "Falha ao obter jogos recomendados. UsuarioId={UsuarioId} Erros={Erros}",
-                usuarioId,
-                resultado.Mensagem);
-
-            return BadRequest(resultado);
-        }
-
-        _logger.LogInformation(
-            "Consulta de jogos recomendados finalizada com sucesso. UsuarioId={UsuarioId}",
-            usuarioId);
-
-        return Ok(resultado);
+        return !resultado.Sucesso ? BadRequest(resultado) : Ok(resultado);
     }
 }
