@@ -35,6 +35,12 @@ public class PaymentSuccessBackgroundService : BackgroundService
             return;
         }
 
+        _logger.LogInformation(
+        "Inicializando PaymentSuccessBackgroundService. Queue={Queue}, MaxConcurrentCalls={MaxConcurrentCalls}, Prefetch={Prefetch}",
+        _options.PaymentSuccessQueue,
+        _options.MaxConcurrentCalls,
+        _options.PrefetchCount);
+
         var processorOptions = new ServiceBusProcessorOptions
         {
             MaxConcurrentCalls = _options.MaxConcurrentCalls,
@@ -58,27 +64,42 @@ public class PaymentSuccessBackgroundService : BackgroundService
         }
         catch (OperationCanceledException)
         {
-                
+            _logger.LogInformation("CancellationToken acionado. Encerrando PaymentSuccessBackgroundService.");
         }
         finally
         {
-            _logger.LogInformation("Parando o Service Bus Processor...");
+            _logger.LogInformation("Parando o Service Bus Processor da fila {Queue}", _options.PaymentSuccessQueue);
+
             if (_processor is not null)
             {
                 try
                 {
                     await _processor.StopProcessingAsync(CancellationToken.None);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao parar o Service Bus Processor.");
+                }
+
                 _processor.ProcessMessageAsync -= OnMessageAsync;
                 _processor.ProcessErrorAsync -= OnErrorAsync;
+
                 await _processor.DisposeAsync();
+                _logger.LogInformation("Service Bus Processor descartado.");
             }
         }
     }
     
     private async Task OnMessageAsync(ProcessMessageEventArgs args)
     {
+        var messageId = args.Message.MessageId;
+        var correlationId = args.Message.CorrelationId;
+
+        _logger.LogInformation(
+            "Mensagem recebida. MessageId={MessageId}, CorrelationId={CorrelationId}",
+            messageId,
+            correlationId);
+
         try
         {
             var body = args.Message.Body.ToString();
@@ -96,20 +117,48 @@ public class PaymentSuccessBackgroundService : BackgroundService
 
             using var scope = _scopeFactory.CreateScope();
             var jogoService = scope.ServiceProvider.GetRequiredService<IJogoService>();
+
+            _logger.LogInformation(
+             "Processando pagamento com sucesso para UsuarioId={UsuarioId}, JogoId={JogoId}, MessageId={MessageId}",
+             message.UsuarioId,
+             message.JogoId,
+             messageId);
+
             await jogoService.AdicionaJogoUsuarioAsync(message);
 
             await args.CompleteMessageAsync(args.Message);
+
+            _logger.LogInformation(
+            "Mensagem processada com sucesso. MessageId={MessageId}",
+            messageId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao processar a mensagem (MessageId={MessageId}). Abandonando.", args.Message.MessageId);
-            try { await args.AbandonMessageAsync(args.Message); } catch {  }
+           
+            try 
+            { 
+                await args.AbandonMessageAsync(args.Message); 
+            }
+            catch (Exception abandonEx)
+            {
+                _logger.LogCritical(
+                    abandonEx,
+                    "Falha crítica ao abandonar mensagem. MessageId={MessageId}",
+                    messageId);
+            }
         }
     }
 
     private Task OnErrorAsync(ProcessErrorEventArgs args)
     {
-        _logger.LogError(args.Exception, "Erro no Service Bus Processor. Entity={Entity}, Namespace={Namespace}", args.EntityPath, args.FullyQualifiedNamespace);
+        _logger.LogError(
+            args.Exception,
+            "Erro no Service Bus Processor. Entity={Entity}, Namespace={Namespace}, ErrorSource={ErrorSource}",
+            args.EntityPath,
+            args.FullyQualifiedNamespace,
+            args.ErrorSource); 
+        
         return Task.CompletedTask;
     }
 }
