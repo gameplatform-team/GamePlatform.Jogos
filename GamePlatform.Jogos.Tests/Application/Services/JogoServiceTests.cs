@@ -1,6 +1,3 @@
-using System.Collections.ObjectModel;
-using System.Linq.Expressions;
-using Elastic.Clients.Elasticsearch;
 using GamePlatform.Jogos.Application.DTOs;
 using GamePlatform.Jogos.Application.DTOs.Elastic;
 using GamePlatform.Jogos.Application.DTOs.Jogo;
@@ -9,7 +6,10 @@ using GamePlatform.Jogos.Application.Services;
 using GamePlatform.Jogos.Domain.Entities;
 using GamePlatform.Jogos.Domain.Interfaces;
 using GamePlatform.Jogos.Domain.Interfaces.Messaging;
+using Microsoft.Extensions.Logging;
 using Moq;
+using System.Collections.ObjectModel;
+using System.Linq.Expressions;
 
 namespace GamePlatform.Jogos.Tests.Application.Services;
 
@@ -19,6 +19,7 @@ public class JogoServiceTests
     private readonly Mock<IUsuarioJogosRepository> _usuarioJogosRepoMock;
     private readonly Mock<IServiceBusPublisher> _serviceBusPubclisherMock;
     private readonly Mock<IJogoElasticClient> _elasticClientMock;
+    private readonly Mock<ILogger<JogoService>> _loggerMock;
     private readonly JogoService _jogoService;
 
     public JogoServiceTests()
@@ -27,11 +28,13 @@ public class JogoServiceTests
         _usuarioJogosRepoMock = new Mock<IUsuarioJogosRepository>();
         _serviceBusPubclisherMock = new Mock<IServiceBusPublisher>();
         _elasticClientMock = new Mock<IJogoElasticClient>();
+        _loggerMock = new Mock<ILogger<JogoService>>();
         _jogoService = new JogoService(
             _jogoRepoMock.Object,
             _usuarioJogosRepoMock.Object,
             _serviceBusPubclisherMock.Object,
-            _elasticClientMock.Object);
+            _elasticClientMock.Object,
+            _loggerMock.Object);
     }
 
     [Fact]
