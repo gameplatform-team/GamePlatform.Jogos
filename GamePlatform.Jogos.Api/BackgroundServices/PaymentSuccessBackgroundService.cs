@@ -96,9 +96,8 @@ public class PaymentSuccessBackgroundService : BackgroundService
         var correlationId = args.Message.CorrelationId;
 
         _logger.LogInformation(
-            "Mensagem recebida. MessageId={MessageId}, CorrelationId={CorrelationId}",
-            messageId,
-            correlationId);
+            "Mensagem de pagamento bem sucedido recebida da fila {PaymentSuccessQueue}. MessageId={MessageId}, CorrelationId={CorrelationId}",
+            _options.PaymentSuccessQueue, messageId, correlationId);
 
         try
         {

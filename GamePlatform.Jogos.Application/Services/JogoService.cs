@@ -12,6 +12,8 @@ namespace GamePlatform.Jogos.Application.Services;
 
 public class JogoService : IJogoService
 {
+    private const string GamePurchaseRequestedQueue = "game-purchase-requested";
+    
     private readonly IJogoRepository _jogoRepository;
     private readonly IUsuarioJogosRepository _usuarioJogosRepository;
     private readonly IServiceBusPublisher _publisher;
@@ -198,15 +200,15 @@ public class JogoService : IJogoService
 
         var messageId = Guid.NewGuid().ToString();
         await _publisher.PublishAsync(
-            queueName: "game-purchase-requested",
+            queueName: GamePurchaseRequestedQueue,
             message: message,
             messageId: messageId,
             correlationId: usuarioId.ToString(),
             ct: CancellationToken.None
         );
 
-        _logger.LogInformation("Mensagem de solicitação de compra publicada na fila. MessageId: {MessageId}, Usuario: {UsuarioId}, Jogo: {JogoId}",
-            messageId, usuarioId, comprarJogoDto.JogoId);
+        _logger.LogInformation("Mensagem de solicitação de compra publicada na fila {GamePurchaseRequestedQueue}. MessageId: {MessageId}, Usuario: {UsuarioId}, Jogo: {JogoId}",
+            GamePurchaseRequestedQueue, messageId, usuarioId, comprarJogoDto.JogoId);
 
         var responseDto = new ComprarJogoResponseDto("Compra iniciada. Aguarde confirmação.", "Pendente", comprarJogoDto.JogoId);
         return new DataResponseDto<ComprarJogoResponseDto>(true, string.Empty, responseDto);
