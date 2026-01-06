@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gameplatform-jogos
+spec:
+  type: LoadBalancer
+  selector:
+    app: gameplatform-jogos
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8081

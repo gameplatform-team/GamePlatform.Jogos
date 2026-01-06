@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gameplatform-jogos
+  labels:
+    app: gameplatform-jogos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gameplatform-jogos
+  template:
+    metadata:
+      labels:
+        app: gameplatform-jogos
+    spec:
+      containers:
+      - name: gameplatform-jogos
+        image: IMAGE_PLACEHOLDER
+        ports:
+        - containerPort: 8081
+        envFrom:
+        - secretRef:
+            name: gameplatform-jogos-secret

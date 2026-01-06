@@ -58,12 +58,33 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy para o Azure Container Apps
-        uses: azure/container-apps-deploy-action@v1
+      - name: Kubernetes Set Context
+        uses: Azure/k8s-set-context@v3.0
         with:
-          resourceGroup: 'gameplatform'
-          containerAppName: 'gameplatform-jogos-api'
-          imageToDeploy: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
-          targetPort: 8081
-          location: 'brazilsouth'
-          containerAppEnvironment: 'gameplatform-apis'
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
+      - name: Criar/atualizar secrets no AKS
+        run: |
+          kubectl create secret generic gameplatform-jogos-secret \
+            --from-literal=ConnectionStrings__DefaultConnection="${{ secrets.DB_CONNECTION_STRING }}" \
+            --from-literal=Jwt__Key="${{ secrets.JWT_SECRET }}" \
+            --from-literal=Jwt__Issuer="${{ secrets.JWT_ISSUER }}" \
+            --from-literal=Jwt__Audience="${{ secrets.JWT_AUDIENCE }}" \
+            --from-literal=ServiceBus__ConnectionString="${{ secrets.SERVICE_BUS_CONNECTION_STRING }}" \
+            --from-literal=ServiceBus__GamePurchaseRequestedQueue="${{ secrets.SERVICE_BUS_PURCHASE_REQUESTED_QUEUE }}" \
+            --from-literal=ServiceBus__PaymentSuccessQueue="${{ secrets.SERVICE_BUS_PAYMENT_SUCCESS_QUEUE }}" \
+            --from-literal=NEW_RELIC_LICENSE_KEY="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            --from-literal=NEW_RELIC_APP_NAME="${{ secrets.NEW_RELIC_APP_NAME }}" \
+            --from-literal=WEBSITES_ENABLE_APP_SERVICE_STORAGE="${{ secrets.WEBSITES_ENABLE_APP_SERVICE_STORAGE }}" \
+            --from-literal=ElasticSettings__Uri="${{ secrets.ELASTIC_URI }}" \
+            --from-literal=ElasticSettings__CloudId="${{ secrets.ELASTIC_CLOUD_ID }}" \
+            --from-literal=ElasticSettings__ApiKey="${{ secrets.ELASTIC_API_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy para o AKS
+        run: |
+          sed -i "s|IMAGE_PLACEHOLDER|${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}|g" k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/hpa.yaml
